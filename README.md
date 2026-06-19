@@ -77,6 +77,14 @@ docker compose logs -f
 
 **機密一律走 env,不進版控**(`.gitignore` 已擋 `.env` 與 `service_account.json`)。
 
+## 與 voc 對接
+
+bot 是上游:寫 Google 表「短影音進度N」的「暫存區」分頁。下游 [voc](https://github.com/pei760730/voc) 的 `voc sync-pool` 從同一張表讀「暫存區」→ 映射進「參考池」,再走 pick→待拍→完成。
+
+- bot `GOOGLE_SHEET_ID` 要等於 voc 的 `VOC_SPREADSHEET_ID`,憑證共用同一把 service account。
+- voc 按表頭名讀 `PLATFORM / VIDEO_REF / CLEAN_URL / VIDEO_ID / SENDER / DATE / NOTE` 這 7 欄(改欄名要兩 repo 一起改)。
+- 細節與已知去重 caveat 見 `CLAUDE.md` 第六層。
+
 ## 設計原則
 
 - pipeline 全純函式,I/O(去重 / 寫入)隔在 storage 與 handler。

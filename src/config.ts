@@ -25,17 +25,20 @@ function boolEnv(name: string, fallback: boolean): boolean {
 }
 
 export type BotMode = "polling" | "webhook";
+export type StorageMode = "sheets" | "memory";
 
 export interface Config {
   telegramToken: string;
   mode: BotMode;
+  storage: StorageMode;
   webhook: { domain: string; path: string; port: number };
+  /** memory 乾跑模式下為 null(不需 Google 憑證)。 */
   google: {
     /** 解析後的 service account 憑證物件。 */
     credentials: { client_email: string; private_key: string };
     sheetId: string;
     stagingSheetName: string;
-  };
+  } | null;
   adminChatId: string;
   errorChatId: string;
   dedupePeriodDays: number;
@@ -87,19 +90,26 @@ let cached: Config | null = null;
 export function loadConfig(): Config {
   if (cached) return cached;
   const mode = optional("BOT_MODE", "polling") as BotMode;
+  const storage = optional("STORAGE", "sheets") as StorageMode;
+  // memory 乾跑模式不碰 Google 憑證,讓只有 token 也能啟動測 bot 回覆
+  const google =
+    storage === "memory"
+      ? null
+      : {
+          credentials: loadGoogleCredentials(),
+          sheetId: required("GOOGLE_SHEET_ID"),
+          stagingSheetName: optional("STAGING_SHEET_NAME", "暫存區"),
+        };
   cached = {
     telegramToken: required("TELEGRAM_BOT_TOKEN"),
     mode,
+    storage,
     webhook: {
       domain: optional("WEBHOOK_DOMAIN", ""),
       path: optional("WEBHOOK_PATH", "/telegraf"),
       port: Number(optional("PORT", "8080")),
     },
-    google: {
-      credentials: loadGoogleCredentials(),
-      sheetId: required("GOOGLE_SHEET_ID"),
-      stagingSheetName: optional("STAGING_SHEET_NAME", "暫存區"),
-    },
+    google,
     adminChatId: optional("ADMIN_CHAT_ID", ""),
     errorChatId: optional("ERROR_CHAT_ID", ""),
     dedupePeriodDays: Number(optional("DEDUPE_PERIOD_DAYS", "180")),

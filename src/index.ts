@@ -4,6 +4,8 @@
  */
 import { loadConfig } from "./config.js";
 import { GoogleSheetsStorage } from "./storage/googleSheets.js";
+import { MemoryStorage } from "./storage/memory.js";
+import type { Storage } from "./storage/Storage.js";
 import { createBot } from "./bot/router.js";
 import { logger } from "./utils/logger.js";
 
@@ -11,13 +13,21 @@ async function main(): Promise<void> {
   const config = loadConfig();
   process.env.TZ = config.tz; // 固定時區
 
-  const storage = new GoogleSheetsStorage({
-    credentials: config.google.credentials,
-    sheetId: config.google.sheetId,
-    sheetName: config.google.stagingSheetName,
-  });
+  let storage: Storage;
+  if (config.storage === "memory") {
+    // 乾跑:不碰 Google,寫進記憶體(重啟即清空),只驗 bot 回覆與 pipeline
+    storage = new MemoryStorage();
+    logger.warn("STORAGE=memory 乾跑模式:不寫真表,資料只存記憶體");
+  } else {
+    if (!config.google) throw new Error("sheets 模式缺 Google 設定");
+    storage = new GoogleSheetsStorage({
+      credentials: config.google.credentials,
+      sheetId: config.google.sheetId,
+      sheetName: config.google.stagingSheetName,
+    });
+  }
 
-  // 啟動先確保表頭對齊 schema(冪等)
+  // 啟動先確保表頭對齊 schema(冪等;memory 版為 noop)
   await storage.ensureHeader();
 
   const bot = createBot(config, storage);

@@ -53,3 +53,22 @@
 - `/stats` 顯示哪些數字 —— 現為預設版(總筆數+各平台+本週/本月+狀態+最近5筆)。
 - `/move` 行為 —— 現為「改 STATUS active→moved、不搬表」。要加「正式區」分頁時改 `handlers/move.ts` + storage。
 - 短網址展開(`EXPAND_SHORT_URLS`)預設關;要開再驗 redirect 行為。
+
+## 第六層:與 voc 對接契約(改欄位前先讀!跨 repo)
+
+bot 是上游:寫 Google 表「**短影音進度N**」(`1V_CaTb…`,= voc 的 `VOC_SPREADSHEET_ID`)的「**暫存區**」分頁。
+voc 的 `src/voc/sync.py`(指令 `voc sync-pool`)從**同一張表**讀「暫存區」→ 映射進「參考池」。bot 不重造輪子,voc 直接消費 bot 解析好的欄位。
+
+- **同一張表**:bot `GOOGLE_SHEET_ID` 必須 = voc `VOC_SPREADSHEET_ID`(`1V_CaTb…`)。憑證共用 voc 的 `service_account.json`(`voc-sheets@voc-499914`)。
+- **bot 自建暫存區分頁**:voc `init-sheet` 不建「暫存區」,由 bot `GoogleSheetsStorage.ensureHeader` 啟動時自建(addSheet + 表頭)。
+- **契約欄位(voc 按表頭名讀這 7 欄,改名要兩邊一起改)**:
+  - `PLATFORM` → 平台(voc `_PLATFORM_MAP` 轉小寫;7 個顯示名都對得上)
+  - `VIDEO_REF` → 原始連結
+  - `CLEAN_URL` → 乾淨連結(**voc 去重 key 來源**)
+  - `VIDEO_ID` → 影片ID
+  - `SENDER` → 來源
+  - `DATE` → 加入日期(voc `normalize_date` 轉 ISO)
+  - `NOTE` → 點子(使用者打的「梗」,給之後 AI 編劇)
+- **去重**:voc 用**乾淨連結**(非 VIDEO_ID,因 bot 帶前綴 `ig_xxx` 跟 voc 裸 id 對不上)。冪等,重跑 sync 不重複進參考池。
+- **⚠️ 已知 bug(在 voc 端)**:voc `_dedup_key` 會砍掉乾淨連結的 `?query`,YouTube/Facebook 影片 ID 在 query → 所有 watch 連結塌成同一 key、第二支以後被誤判重複丟掉。修法在 voc:去重改用 `平台+裸影片ID`(切掉 bot 前綴)。**改 voc 那條另開 voc session**,別從 bot 這條滑進上游。
+- 驗證腳本:`npx tsx scripts/verify-sheet.ts`(唯讀,列分頁/確認參考池在)。
