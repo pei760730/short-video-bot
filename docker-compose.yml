@@ -1,0 +1,13 @@
+services:
+  bot:
+    build: .
+    container_name: short-video-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # 自架預設長連線,不需公網 IP / webhook
+      BOT_MODE: polling
+    # 若改 webhook 模式,打開下面對外埠並設 WEBHOOK_DOMAIN
+    # ports:
+    #   - "8080:8080"

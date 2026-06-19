@@ -1,0 +1,50 @@
+/**
+ * 記憶體版 Storage —— 給單元測試與本機 dry-run 用,不碰網路。
+ */
+import type { Storage, DuplicateHit, StatsSummary } from "./Storage.js";
+import type { StagingRow } from "../types.js";
+import { STAGING_COLUMNS } from "../types.js";
+import { computeStats } from "./computeStats.js";
+import { ageInDays } from "../utils/date.js";
+
+export class MemoryStorage implements Storage {
+  private rows: StagingRow[] = [];
+
+  constructor(seed: StagingRow[] = []) {
+    this.rows = [...seed];
+  }
+
+  async ensureHeader(): Promise<void> {
+    // 記憶體版用固定 schema,無需建表頭。引用 STAGING_COLUMNS 確保 schema 對齊。
+    void STAGING_COLUMNS;
+  }
+
+  async findByVideoId(videoId: string, withinDays?: number): Promise<DuplicateHit | null> {
+    const key = videoId.trim();
+    for (let i = 0; i < this.rows.length; i++) {
+      const r = this.rows[i]!;
+      if (r.VIDEO_ID.trim() !== key) continue;
+      if (withinDays != null && ageInDays(r.DATE) > withinDays) continue;
+      return { row: r, rowNumber: i + 2 }; // +2:表頭 + 1-based
+    }
+    return null;
+  }
+
+  async append(row: StagingRow): Promise<void> {
+    this.rows.push(row);
+  }
+
+  async readAll(): Promise<StagingRow[]> {
+    return [...this.rows];
+  }
+
+  async updateStatus(rowNumber: number, status: string): Promise<void> {
+    const idx = rowNumber - 2;
+    const r = this.rows[idx];
+    if (r) r.STATUS = status;
+  }
+
+  async stats(opts: { recentLimit: number; nowMs: number }): Promise<StatsSummary> {
+    return computeStats(this.rows, opts);
+  }
+}
