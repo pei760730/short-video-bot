@@ -19,20 +19,22 @@ export async function runStats(deps: StatsDeps): Promise<string> {
     return "📊 暫存區目前是空的。";
   }
 
-  const platformLines = Object.entries(s.byPlatform)
-    .sort((a, b) => b[1] - a[1])
-    .map(([p, n]) => `  ${p}：${n}`);
-
-  const statusLines = Object.entries(s.byStatus)
-    .sort((a, b) => b[1] - a[1])
-    .map(([st, n]) => `  ${st}：${n}`);
+  // 限筆數,避免亂資料把分類撐爆(Telegram 4096 字上限)
+  const capList = (obj: Record<string, number>, max = 15) => {
+    const entries = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+    const head = entries.slice(0, max).map(([k, n]) => `  ${k}：${n}`);
+    if (entries.length > max) head.push(`  …(其餘 ${entries.length - max} 類)`);
+    return head;
+  };
+  const platformLines = capList(s.byPlatform);
+  const statusLines = capList(s.byStatus);
 
   const recentLines = s.recent.map((r) => {
     const note = r.NOTE ? ` — ${r.NOTE}` : "";
     return `  ${r.PLATFORM_ICON || "•"} ${r.VIDEO_ID}${note}（${r.DATE}）`;
   });
 
-  return [
+  const out = [
     `📊 暫存區統計（共 ${s.total} 筆）`,
     "",
     "各平台：",
@@ -46,4 +48,7 @@ export async function runStats(deps: StatsDeps): Promise<string> {
     `最近 ${s.recent.length} 筆：`,
     ...recentLines,
   ].join("\n");
+
+  // Telegram 單則上限 4096;保險再硬切
+  return out.length > 3900 ? out.slice(0, 3900) + "\n…(已截斷)" : out;
 }

@@ -21,6 +21,7 @@ export class MemoryStorage implements Storage {
 
   async findByVideoId(videoId: string, withinDays?: number): Promise<DuplicateHit | null> {
     const key = videoId.trim();
+    if (!key) return null; // 空 key 不去重
     for (let i = 0; i < this.rows.length; i++) {
       const r = this.rows[i]!;
       if (r.VIDEO_ID.trim() !== key) continue;
@@ -36,6 +37,10 @@ export class MemoryStorage implements Storage {
 
   async readAll(): Promise<StagingRow[]> {
     return [...this.rows];
+  }
+
+  async readRows(): Promise<DuplicateHit[]> {
+    return this.rows.map((row, i) => ({ row, rowNumber: i + 2 }));
   }
 
   async updateStatus(rowNumber: number, status: string): Promise<void> {

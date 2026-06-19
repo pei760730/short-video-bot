@@ -38,11 +38,15 @@ const SHORT_URL_HOSTS = new Set([
   "short.link",
 ]);
 
-function hasShortHost(url: string): boolean {
-  const lower = url.toLowerCase();
-  return [...SHORT_URL_HOSTS].some(
-    (h) => lower.includes(`://${h}/`) || lower.includes(`://${h}?`) || lower.endsWith(`://${h}`),
-  );
+/** 是否為已知短網址服務(供 collect 決定要不要展開)。 */
+export function hasShortHost(url: string): boolean {
+  let host: string;
+  try {
+    host = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return SHORT_URL_HOSTS.has(host);
 }
 
 /**

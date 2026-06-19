@@ -26,9 +26,13 @@ const TIKTOK_PATTERNS = [
   /(\d{19})/,
 ];
 const INSTAGRAM_PATTERNS = [/\/(p|reel)\/([a-zA-Z0-9_-]+)/];
+// 只認真正帶影片 id 的形態 —— 不要用裸 `/([11])`,否則 /channel/UC… 之類會被誤抓。
 const YOUTUBE_PATTERNS = [
   /shorts\/([a-zA-Z0-9_-]{11})/,
-  /(?:v=|\/)([a-zA-Z0-9_-]{11})/,
+  /[?&]v=([a-zA-Z0-9_-]{11})/,
+  /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+  /\/embed\/([a-zA-Z0-9_-]{11})/,
+  /\/live\/([a-zA-Z0-9_-]{11})/,
 ];
 const XHS_PATTERNS = [/\/explore\/([a-zA-Z0-9]+)/];
 

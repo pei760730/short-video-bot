@@ -35,6 +35,9 @@ export interface Storage {
   /** 讀全部資料列(不含表頭)。 */
   readAll(): Promise<StagingRow[]>;
 
+  /** 讀全部資料列 + **正確實體列號**(供 /move 安全更新;空白列已跳過但列號正確)。 */
+  readRows(): Promise<DuplicateHit[]>;
+
   /** 更新某列的 STATUS(供 /move)。 */
   updateStatus(rowNumber: number, status: string): Promise<void>;
 

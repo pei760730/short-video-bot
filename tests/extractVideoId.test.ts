@@ -68,4 +68,9 @@ describe("extractVideoId", () => {
     expect(r.unsupported).toBe(true);
     expect(r.videoId).toBe("unknown_1700000000000");
   });
+
+  it("YouTube channel/@user 不該被當成影片", () => {
+    expect(extractVideoId("YouTube", "https://www.youtube.com/channel/UCabcdefghij", FIXED).unsupported).toBe(true);
+    expect(extractVideoId("YouTube", "https://www.youtube.com/@someuser11", FIXED).unsupported).toBe(true);
+  });
 });

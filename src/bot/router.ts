@@ -32,10 +32,10 @@ export function createBot(config: Config, storage: Storage): Telegraf {
   // /stats
   bot.command("stats", async (ctx) => {
     try {
-      ctx.reply(await runStats({ storage }));
+      await ctx.reply(await runStats({ storage }));
     } catch (err) {
       logger.error("/stats 失敗", err);
-      ctx.reply("❌ 取統計失敗。");
+      await ctx.reply("❌ 取統計失敗。").catch(() => {});
       await notifyError(`/stats 失敗:${errText(err)}`);
     }
   });
@@ -44,10 +44,10 @@ export function createBot(config: Config, storage: Storage): Telegraf {
   bot.command("move", async (ctx) => {
     const arg = commandArg(ctx, "move");
     try {
-      ctx.reply(await runMove(arg, { storage }));
+      await ctx.reply(await runMove(arg, { storage }));
     } catch (err) {
       logger.error("/move 失敗", err);
-      ctx.reply("❌ 搬移失敗。");
+      await ctx.reply("❌ 搬移失敗。").catch(() => {});
       await notifyError(`/move 失敗:${errText(err)}`);
     }
   });

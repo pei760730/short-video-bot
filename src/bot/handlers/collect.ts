@@ -5,9 +5,22 @@
  */
 import { parseMessage, NoUrlError } from "../../pipeline/parse.js";
 import { assembleDraft } from "../../pipeline/index.js";
+import { hasShortHost } from "../../pipeline/cleanUrl.js";
 import type { Storage } from "../../storage/Storage.js";
 import { expandShortUrl } from "../../utils/expandUrl.js";
 import { logger } from "../../utils/logger.js";
+
+// 同進程序列化 dedup→append,避免同一連結極短時間連發時兩條都過去重再雙寫。
+// (跨進程要靠單一 bot 實例;我們就是單實例 polling。)
+let lock: Promise<unknown> = Promise.resolve();
+function serialize<T>(fn: () => Promise<T>): Promise<T> {
+  const run = lock.then(fn, fn);
+  lock = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 import {
   formatErrorMsg,
   successMsg,
@@ -44,8 +57,9 @@ export async function runCollect(
     throw err;
   }
 
-  // 短網址展開(opt-in)。展開在 clean 之前,讓平台判斷吃到真實網址。
-  if (deps.expandShortUrls) {
+  // 短網址展開(opt-in,且只對「已知短網址服務」展開,別對每條連結都發 HEAD
+  // / 把正常連結跟著 redirect 跑到登入頁)。展開在 clean 之前,平台判斷吃真實網址。
+  if (deps.expandShortUrls && hasShortHost(parsed.rawUrl)) {
     const expanded = await expandShortUrl(parsed.rawUrl);
     if (expanded !== parsed.rawUrl) {
       parsed = { ...parsed, rawUrl: expanded };
@@ -54,30 +68,32 @@ export async function runCollect(
 
   const draft = assembleDraft(parsed, now);
 
-  // 去重:只看 N 天內的同 VIDEO_ID(改進#3)。unknown_* 視為唯一,不去重。
-  if (!draft.unsupported) {
-    const hit = await deps.storage.findByVideoId(draft.videoId, deps.dedupePeriodDays);
-    if (hit) {
-      return { reply: duplicateMsg(hit.row) };
+  // 去重 + 寫入序列化,避免並發雙寫。unknown_* 視為唯一,不去重。
+  return serialize(async () => {
+    if (!draft.unsupported) {
+      const hit = await deps.storage.findByVideoId(draft.videoId, deps.dedupePeriodDays);
+      if (hit) {
+        return { reply: duplicateMsg(hit.row) };
+      }
     }
-  }
 
-  try {
-    await deps.storage.append(draft.row);
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    logger.error("寫入暫存區失敗", err);
+    try {
+      await deps.storage.append(draft.row);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      logger.error("寫入暫存區失敗", err);
+      return {
+        reply: saveErrorMsg(detail),
+        error: `collect 寫入失敗:${detail}｜url=${draft.row.VIDEO_REF}`,
+      };
+    }
+
+    logger.info(`收錄 ${draft.row.PLATFORM} ${draft.videoId}`);
     return {
-      reply: saveErrorMsg(detail),
-      error: `collect 寫入失敗:${detail}｜url=${draft.row.VIDEO_REF}`,
+      reply: successMsg(draft.row, {
+        unsupported: draft.unsupported,
+        isShortUrl: draft.isShortUrl,
+      }),
     };
-  }
-
-  logger.info(`收錄 ${draft.row.PLATFORM} ${draft.videoId}`);
-  return {
-    reply: successMsg(draft.row, {
-      unsupported: draft.unsupported,
-      isShortUrl: draft.isShortUrl,
-    }),
-  };
+  });
 }

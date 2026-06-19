@@ -26,4 +26,23 @@ describe("parseMessage", () => {
     const r = parseMessage({ text: "https://x.com/a/status/1" });
     expect(r.sender).toBe("unknown");
   });
+
+  it("連結後黏中文(沒空格)→ 不吃進 URL", () => {
+    const r = parseMessage({ text: "https://youtu.be/dQw4w9WgXcQ。很好笑" });
+    expect(r.rawUrl).toBe("https://youtu.be/dQw4w9WgXcQ");
+    expect(r.note).toContain("很好笑");
+  });
+
+  it("剝掉尾端標點", () => {
+    expect(parseMessage({ text: "看 https://x.com/a/status/1)" }).rawUrl).toBe(
+      "https://x.com/a/status/1",
+    );
+    expect(parseMessage({ text: "https://x.com/a/status/1, lol" }).rawUrl).toBe(
+      "https://x.com/a/status/1",
+    );
+  });
+
+  it("https:// 後面全是標點 → 視為沒網址", () => {
+    expect(() => parseMessage({ text: "https://。。。" })).toThrow(NoUrlError);
+  });
 });

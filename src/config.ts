@@ -29,6 +29,27 @@ function boolEnv(name: string, fallback: boolean): boolean {
   return ["1", "true", "yes", "on"].includes(v.trim().toLowerCase());
 }
 
+/** 數字環境變數;打錯成非數字直接丟錯(fail-fast,不要默默 NaN)。 */
+function numEnv(name: string, fallback: number): number {
+  const v = process.env[name];
+  if (v == null || v.trim() === "") return fallback;
+  const n = Number(v.trim());
+  if (!Number.isFinite(n)) {
+    throw new Error(`環境變數 ${name} 不是合法數字:'${v}'`);
+  }
+  return n;
+}
+
+/** 限定值環境變數;不在白名單直接丟錯。 */
+function enumEnv<T extends string>(name: string, allowed: readonly T[], fallback: T): T {
+  const v = (process.env[name] ?? "").trim();
+  if (v === "") return fallback;
+  if (!(allowed as readonly string[]).includes(v)) {
+    throw new Error(`環境變數 ${name} 只能是 ${allowed.join(" / ")},收到:'${v}'`);
+  }
+  return v as T;
+}
+
 export type BotMode = "polling" | "webhook";
 export type StorageMode = "sheets" | "memory";
 
@@ -94,8 +115,8 @@ let cached: Config | null = null;
 
 export function loadConfig(): Config {
   if (cached) return cached;
-  const mode = optional("BOT_MODE", "polling") as BotMode;
-  const storage = optional("STORAGE", "sheets") as StorageMode;
+  const mode = enumEnv("BOT_MODE", ["polling", "webhook"] as const, "polling");
+  const storage = enumEnv("STORAGE", ["sheets", "memory"] as const, "sheets");
   // memory 乾跑模式不碰 Google 憑證,讓只有 token 也能啟動測 bot 回覆
   const google =
     storage === "memory"
@@ -112,12 +133,12 @@ export function loadConfig(): Config {
     webhook: {
       domain: optional("WEBHOOK_DOMAIN", ""),
       path: optional("WEBHOOK_PATH", "/telegraf"),
-      port: Number(optional("PORT", "8080")),
+      port: numEnv("PORT", 8080),
     },
     google,
     adminChatId: optional("ADMIN_CHAT_ID", ""),
     errorChatId: optional("ERROR_CHAT_ID", ""),
-    dedupePeriodDays: Number(optional("DEDUPE_PERIOD_DAYS", "180")),
+    dedupePeriodDays: numEnv("DEDUPE_PERIOD_DAYS", 180),
     expandShortUrls: boolEnv("EXPAND_SHORT_URLS", false),
     tz: optional("TZ", "Asia/Taipei"),
     logLevel: optional("LOG_LEVEL", "info"),

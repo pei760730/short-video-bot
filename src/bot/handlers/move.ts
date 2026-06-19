@@ -17,11 +17,9 @@ export interface MoveDeps {
 
 export async function runMove(arg: string, deps: MoveDeps): Promise<string> {
   const target = arg.trim();
-  const rows = await deps.storage.readAll();
-
-  // rowNumber = 索引 + 2(表頭 + 1-based)
-  const candidates = rows
-    .map((row, i) => ({ row, rowNumber: i + 2 }))
+  // 用 readRows 取「正確實體列號」—— 不要自己從 readAll 的索引推算
+  //(readAll 會濾空白列,索引會跟實體列號脫鉤,寫到錯的格)。
+  const candidates = (await deps.storage.readRows())
     .filter((x) => x.row.STATUS === STATUS.ACTIVE)
     .filter((x) => (target ? x.row.VIDEO_ID.trim() === target : true));
 

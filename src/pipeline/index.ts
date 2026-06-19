@@ -36,7 +36,12 @@ export function buildDraft(input: ParseInput, now: () => number = Date.now): Dra
 export function assembleDraft(parsed: ParsedMessage, now: () => number = Date.now): Draft {
   const cleaned = cleanUrl(parsed.rawUrl);
   const platform = detectPlatform(cleaned.cleanUrl);
-  const vid = extractVideoId(platform.platform, cleaned.cleanUrl, now);
+  // 只在「真的比對到網域」時抽 id。fallback(猜 Instagram)/error 不抽,
+  // 否則 random.com/p/xxx 會被造出假的 ig_xxx 並當成可去重的正常影片。
+  const vid =
+    platform.method === "domain_match"
+      ? extractVideoId(platform.platform, cleaned.cleanUrl, now)
+      : { videoId: `unknown_${now()}`, unsupported: true };
 
   const date = todayTaipei(now());
   // 改進#1:VIDEO_ID 不帶多餘空白(直接用乾淨字串)

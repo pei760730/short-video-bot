@@ -93,6 +93,17 @@ describe("runCollect", () => {
     expect(row.PLATFORM).toBe("Facebook");
   });
 
+  it("未知網域 fallback → 不造假 ig_ id(標 unknown)", async () => {
+    const storage = new MemoryStorage();
+    await runCollect(
+      { text: "https://random.com/p/whatever 測試", senderName: "Pei" },
+      deps(storage),
+    );
+    const row = (await storage.readAll())[0]!;
+    expect(row.VIDEO_ID).toMatch(/^unknown_/);
+    expect(row.VIDEO_ID).not.toMatch(/^ig_/);
+  });
+
   it("寫入失敗 → 回錯誤 + error 通知", async () => {
     const storage = new MemoryStorage();
     storage.append = async () => {
